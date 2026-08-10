@@ -64,3 +64,9 @@ The lab includes **20 tested security detection and response use cases** mapped 
 The lab architecture and detection flow are documented here:
 
 👉 [View AJ SIEM Lab Architecture](architecture/lab-architecture.md)
+
+## Active Response
+
+The lab includes automated containment and response actions for high-confidence detections.
+
+👉 [View Active Response Documentation](active-response/README.md)
