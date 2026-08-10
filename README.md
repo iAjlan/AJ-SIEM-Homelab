@@ -56,3 +56,11 @@ All testing was performed inside an isolated virtual environment.
 The lab includes **20 tested security detection and response use cases** mapped to MITRE ATT&CK.
 
 👉 [View all 20 Security Use Cases](documentation/use-cases.md)
+
+
+
+## Lab Architecture
+
+The lab architecture and detection flow are documented here:
+
+👉 [View AJ SIEM Lab Architecture](architecture/lab-architecture.md)
