@@ -52,3 +52,10 @@ All testing was performed inside an isolated virtual environment.
 
 ### Ransomware Detection
 ![Ransomware Detection](ransomware-detection.png)
+
+
+## Security Use Cases
+
+The lab includes **20 tested security detection and response use cases** mapped to MITRE ATT&CK.
+
+👉 [View all 20 Security Use Cases](documentation/use-cases.md)
