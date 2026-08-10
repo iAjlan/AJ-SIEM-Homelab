@@ -70,3 +70,22 @@ The lab architecture and detection flow are documented here:
 The lab includes automated containment and response actions for high-confidence detections.
 
 👉 [View Active Response Documentation](active-response/README.md)
+
+## Project Structure
+
+```text
+AJ-SIEM-Homelab/
+├── README.md
+├── architecture/
+│   └── lab-architecture.md
+├── documentation/
+│   └── use-cases.md
+├── wazuh-rules/
+│   └── aj_siem_rules.xml
+├── active-response/
+│   └── README.md
+└── screenshots/
+    ├── dns-tunneling-active-response.png
+    ├── credential-dumping-active-response.png
+    └── ransomware-detection.png
+```
