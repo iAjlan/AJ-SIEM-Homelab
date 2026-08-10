@@ -1,0 +1,621 @@
+<group name="aj_siem,">
+
+  <!-- =========================================================
+       CASE 01: RDP Brute Force
+       Source: Windows Security Event 4625
+       MITRE ATT&CK: T1110.001
+       ========================================================= -->
+
+  <rule id="100101" level="12" frequency="5" timeframe="60">
+    <if_matched_sid>60122</if_matched_sid>
+    <same_field>win.eventdata.ipAddress</same_field>
+    <description>AJ SIEM: RDP brute-force detected from $(win.eventdata.ipAddress) against $(win.eventdata.targetUserName)</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <group>windows,authentication_failed,rdp_bruteforce,case_01,</group>
+  </rule>
+
+
+  <!-- =========================================================
+       CASE 02: SQL Injection Against IIS
+       Source: Microsoft IIS W3C access logs
+       MITRE ATT&CK: T1190
+       ========================================================= -->
+
+  <!-- Warning: Detect one high-confidence SQL injection request -->
+  <rule id="110201" level="10">
+    <if_sid>31108</if_sid>
+<url type="pcre2">(?i)(%27|')(%20|\+)+(or|and)(%20|\+)+.*(%3d|=)</url>
+     <description>AJ SIEM: SQL injection pattern detected from $(srcip) against IIS: $(url)</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>web,attack,sql_injection,case_02,</group>
+  </rule>
+
+  <!-- Active Response trigger: Three attempts in 60 seconds -->
+  <rule id="110202" level="13" frequency="3" timeframe="60">
+    <if_matched_sid>110201</if_matched_sid>
+    <same_srcip />
+    <description>AJ SIEM: Repeated SQL injection attempts from $(srcip) against IIS</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>web,attack,sql_injection,active_response,case_02,</group>
+  </rule>
+
+<!-- =========================================================
+     CASE 03: Directory Traversal Against IIS
+     Source: Microsoft IIS W3C access logs
+     MITRE ATT&CK: T1190
+     Response: Alert only
+     ========================================================= -->
+
+<rule id="110301" level="10">
+  <if_sid>31108</if_sid>
+  <url type="pcre2">(?i)(?:\.\.|%2e%2e)(?:/|%2f|\\|%5c)</url>
+  <description>AJ SIEM: Directory traversal attempt from $(srcip) against IIS: $(url)</description>
+  <mitre>
+    <id>T1190</id>
+  </mitre>
+  <group>web,attack,directory_traversal,case_03,</group>
+</rule>
+<!-- =========================================================
+     CASE 04: Suspicious Outbound C2 Connection
+     Source: Sysmon Event 3
+     MITRE ATT&CK: T1071.001
+     Response: Alert + Block destination IP
+     ========================================================= -->
+
+<rule id="110401" level="13">
+  <if_sid>61605</if_sid>
+  <field name="win.eventdata.destinationIp" type="pcre2">^192\.168\.72\.131$</field>
+  <field name="win.eventdata.destinationPort" type="pcre2">^8080$</field>
+  <description>AJ SIEM: Suspicious outbound C2 connection from $(win.eventdata.sourceIp) to $(win.eventdata.destinationIp):$(win.eventdata.destinationPort) by $(win.eventdata.image)</description>
+  <mitre>
+    <id>T1071.001</id>
+  </mitre>
+  <group>sysmon,network,c2,suspicious_outbound,active_response,case_04,</group>
+</rule>
+  <!-- Active Response status for C2 blocking -->
+  <rule id="110411" level="10">
+    <match>block-c2.ps1: Blocked outbound C2 destination</match>
+    <description>AJ SIEM: Active Response blocked the suspicious C2 destination</description>
+    <group>active_response,c2,blocked,</group>
+  </rule>
+
+  <rule id="110412" level="5">
+    <match>block-c2.ps1: Removed outbound C2 block</match>
+    <description>AJ SIEM: Active Response automatically removed the C2 block after timeout</description>
+    <group>active_response,c2,unblocked,</group>
+  </rule>
+
+  <!-- =========================================================
+       CASE 05: Suspicious DNS / DNS Tunneling
+       Source: Sysmon Event 22
+       ========================================================= -->
+
+  <rule id="110501" level="11">
+    <if_sid>61650</if_sid>
+    <field name="win.eventdata.queryName" type="pcre2">(?i)(?:^|\.)[a-z0-9_-]{45,}(?:\.|$)</field>
+    <description>AJ SIEM: Suspicious DNS query with unusually long encoded-looking subdomain: $(win.eventdata.queryName) by $(win.eventdata.image)</description>
+    <mitre>
+      <id>T1071.004</id>
+    </mitre>
+    <group>sysmon,dns,dns_tunneling,suspicious_dns,case_05,</group>
+  </rule>
+
+  <!-- Escalation: Repeated suspicious DNS queries by the same process -->
+  <rule id="110502" level="14" frequency="5" timeframe="60">
+    <if_matched_sid>110501</if_matched_sid>
+    <same_field>win.eventdata.processGuid</same_field>
+    <description>AJ SIEM: Probable DNS tunneling detected - repeated long DNS queries by $(win.eventdata.image)</description>
+    <mitre>
+      <id>T1071.004</id>
+    </mitre>
+    <group>sysmon,dns,dns_tunneling,probable_dns_tunnel,case_05,</group>
+  </rule>
+  <!-- Active Response status: DNS tunneling process terminated -->
+  <rule id="110511" level="10">
+    <match>kill-dns-tunnel.ps1: Terminated probable DNS tunneling process</match>
+    <description>AJ SIEM: Active Response terminated the probable DNS tunneling process</description>
+    <group>active_response,dns,dns_tunneling,process_terminated,case_05,</group>
+  </rule>
+
+<!-- =========================================================
+     CASE 06: Potential IIS Web Shell File Drop
+     Source: Wazuh FIM - Rule 554
+     ========================================================= -->
+
+<rule id="110601" level="10">
+  <if_sid>554</if_sid>
+  <field name="file" type="pcre2">(?i)^c:\\inetpub\\wwwroot\\.*\.(?:asp|aspx|ashx|asmx)$</field>
+  <description>AJ SIEM: Potential web shell file added to IIS web root: $(file)</description> 
+ <mitre> <id>T1505.003</id> </mitre>
+  <group>iis,webshell,fim,file_drop,persistence,case_06,</group>
+</rule>
+
+<!-- Escalation: Successful web-shell-like request through IIS -->
+<rule id="110602" level="13">
+  <if_sid>31108</if_sid>
+  <url type="pcre2">(?i)\.(?:asp|aspx|ashx|asmx)\s+(?:cmd|exec|command|shell)=</url>
+  <description>AJ SIEM: High-confidence IIS web shell-like request detected from $(srcip): $(url)</description>
+  <mitre>
+    <id>T1505.003</id>
+  </mitre>
+  <group>iis,webshell,web_access,high_confidence,case_06,</group>
+</rule>
+<!-- =========================================================
+     CASE 07: IIS Worker Process Spawning Command Shell
+     Source: Sysmon Event 1
+     MITRE ATT&CK: T1059.003 / T1059.001
+     Response: Alert first
+     ========================================================= -->
+
+<rule id="110701" level="14">
+  <if_group>sysmon_event1</if_group>
+  <field name="win.eventdata.parentImage" type="pcre2">(?i)w3wp\.exe$</field>
+<field name="win.eventdata.image" type="pcre2">(?i)(cmd|powershell)\.exe$</field>
+  <description>AJ SIEM: IIS worker process spawned command shell: $(win.eventdata.parentImage) -> $(win.eventdata.image) | CMD: $(win.eventdata.commandLine)</description>
+  <mitre>
+    <id>T1059.003</id>
+    <id>T1059.001</id>
+  </mitre>
+  <group>iis,process_creation,webshell_execution,command_shell,high_confidence,case_07,</group>
+
+</rule>
+<rule id="110711" level="10">
+  <match>kill-iis-child.ps1: Terminated IIS child process</match>
+  <description>AJ SIEM: Active Response terminated suspicious IIS child process</description>
+  <group>active_response,iis,process_terminated,case_07,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 09: SAM Credential Dumping
+     Source: Wazuh built-in rule 92026 / Sysmon Event 1
+     MITRE ATT&CK: T1003.002 - Security Account Manager
+     Severity: Critical
+     Active Response: Terminate suspicious dumping process
+     ========================================================= -->
+
+<rule id="110901" level="15">
+  <if_sid>92026</if_sid>
+
+  <description>AJ SIEM: High-confidence SAM credential dumping attempt detected | CMD: $(win.eventdata.commandLine)</description>
+
+  <mitre>
+    <id>T1003.002</id>
+  </mitre>
+
+  <group>credential_access,credential_dumping,sam,high_confidence,case_09,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 09: Active Response Confirmation
+     Confirms that AJ SIEM successfully terminated the
+     SAM/SYSTEM credential dumping process.
+     ========================================================= -->
+
+<rule id="110911" level="10">
+  <match>contain-sam-dump.ps1: Terminated SAM/SYSTEM credential dumping process</match>
+
+  <description>AJ SIEM: Active Response terminated SAM/SYSTEM credential dumping process</description>
+
+  <group>active_response,credential_access,credential_dumping,sam,process_terminated,case_09,</group>
+</rule>
+<!-- =========================================================
+     CASE 10: Encoded PowerShell Execution
+     Detects PowerShell launched with Base64 encoded commands.
+     Attackers commonly use -EncodedCommand to hide the real
+     command from simple inspection and logging.
+
+     Source: Wazuh built-in rule 92057 / Sysmon Event ID 1
+     MITRE ATT&CK: T1059.001 - PowerShell
+     Severity: Critical
+     Active Response: Terminate encoded PowerShell process
+     ========================================================= -->
+
+<rule id="111001" level="15">
+  <if_group>sysmon_event1</if_group>
+
+  <field name="win.eventdata.image" type="pcre2">(?i)powershell[.]exe$</field>
+  <field name="win.eventdata.commandLine" type="pcre2">(?i)-(encodedcommand|e|ea|ec|encodeda|encode|en|enco)( |$)</field>
+
+  <description>AJ SIEM: High-confidence encoded PowerShell execution detected | CMD: $(win.eventdata.commandLine)</description>
+
+  <mitre>
+    <id>T1059.001</id>
+  </mitre>
+
+  <group>powershell,encoded_command,execution,high_confidence,case_10,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 10: Active Response Confirmation
+     Confirms that AJ SIEM terminated the encoded
+     PowerShell process successfully.
+     ========================================================= -->
+
+<rule id="111011" level="10">
+  <match>kill-encoded-powershell.ps1: Terminated encoded PowerShell process</match>
+
+  <description>AJ SIEM: Active Response terminated encoded PowerShell process</description>
+
+  <group>active_response,powershell,encoded_command,process_terminated,case_10,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 11: Suspicious Binary Download via curl.exe
+     Detects curl.exe being used to download and create a
+     binary file on the Windows endpoint.
+
+     Source: Wazuh built-in rule 92074 / Sysmon Event ID 1
+     MITRE ATT&CK: T1105 - Ingress Tool Transfer
+     Severity: Critical
+     Active Response: Terminate downloader and remove
+                      the downloaded test binary
+     ========================================================= -->
+
+<rule id="111101" level="15">
+  <if_sid>92074</if_sid>
+
+  <description>AJ SIEM: High-confidence suspicious binary download detected via curl.exe | CMD: $(win.eventdata.commandLine)</description>
+
+  <mitre>
+    <id>T1105</id>
+  </mitre>
+
+  <group>command_and_control,ingress_tool_transfer,malware_download,curl,high_confidence,case_11,</group>
+
+</rule>
+<!-- =========================================================
+     CASE 11: Active Response Confirmation
+     Confirms that AJ SIEM removed the suspicious
+     binary downloaded via curl.exe.
+     ========================================================= -->
+
+<rule id="111111" level="10">
+  <match>contain-binary-download.ps1: Removed suspicious downloaded file</match>
+
+  <description>AJ SIEM: Active Response removed suspicious downloaded binary</description>
+
+  <group>active_response,ingress_tool_transfer,malware_download,file_removed,case_11,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 12: MSHTA Remote HTA Execution
+     Detects mshta.exe executing a remote HTA file over
+     HTTP/HTTPS. This behavior is commonly abused for
+     proxy execution of malicious script content.
+
+     Source: Sysmon Event ID 1 - Process Creation
+     MITRE ATT&CK: T1218.005 - Mshta
+     Severity: Critical
+     Active Response: Terminate suspicious mshta.exe process
+     ========================================================= -->
+
+<rule id="111201" level="15">
+  <if_group>sysmon_event1</if_group>
+
+  <field name="win.eventdata.image" type="pcre2">(?i)\\mshta\.exe$</field>
+
+  <field name="win.eventdata.commandLine" type="pcre2">(?i)https?://[^\s"]+\.hta(?:\s|$)</field>
+
+  <description>AJ SIEM: High-confidence remote HTA execution detected via mshta.exe | CMD: $(win.eventdata.commandLine)</description>
+
+  <mitre>
+    <id>T1218.005</id>
+  </mitre>
+
+  <group>execution,defense_evasion,mshta,hta,lolbin,high_confidence,case_12,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 12: Active Response Confirmation
+     Confirms that AJ SIEM terminated the suspicious
+     remote HTA mshta.exe process.
+     ========================================================= -->
+
+<rule id="111211" level="10">
+  <match>kill-mshta.ps1: Terminated remote HTA mshta process</match>
+
+  <description>AJ SIEM: Active Response terminated suspicious remote HTA mshta process</description>
+
+  <group>active_response,mshta,hta,process_terminated,case_12,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 13: Ransomware-like Mass File Renaming
+     Detects multiple files rapidly receiving a .locked
+     extension inside the monitored test directory.
+
+     Source: Wazuh FIM - Rule 554
+     MITRE ATT&CK: T1486 - Data Encrypted for Impact
+     Severity: Critical
+     Active Response: Terminate ransomware simulation process
+     ========================================================= -->
+
+<rule id="111301" level="10">
+  <if_sid>554</if_sid>
+
+  <field name="file" type="pcre2">(?i)\.(locked|encrypted|crypted|crypt|enc)$</field>
+
+  <description>AJ SIEM: Ransomware-like suspicious file detected | File: $(file)</description>
+
+  <mitre>
+    <id>T1486</id>
+  </mitre>
+
+  <group>impact,ransomware,file_modification,fim,case_13,</group>
+</rule>
+
+<rule id="111302" level="15" frequency="5" timeframe="10">
+  <if_matched_sid>111301</if_matched_sid>
+
+  <description>AJ SIEM: High-confidence ransomware-like behavior detected - multiple suspicious files created in a short period</description>
+
+  <mitre>
+    <id>T1486</id>
+  </mitre>
+
+  <group>impact,ransomware,mass_file_modification,high_confidence,case_13,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 13: Active Response Confirmation
+     Confirms that AJ SIEM terminated the ransomware-like
+     PowerShell process after mass .locked file creation.
+     ========================================================= -->
+
+<rule id="111311" level="10">
+  <match>contain-ransomware.ps1: Quarantined ransomware-like file</match>
+
+  <description>AJ SIEM: Active Response quarantined ransomware-like file and preserved SHA256 evidence</description>
+
+  <group>active_response,ransomware,impact,file_quarantined,case_13,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 14: Unauthorized Local User Creation
+     Detects Windows Event ID 4720 - New local user created
+     Base Rule: 60109
+     MITRE ATT&CK: T1098 - Account Manipulation
+     ========================================================= -->
+
+<rule id="111401" level="15">
+  <if_sid>60109</if_sid>
+
+  <field name="win.eventdata.targetUserName" type="pcre2">(?i)^AJ_CASE14_TEST$</field>
+
+  <description>AJ SIEM: High-confidence unauthorized local user creation detected | User: $(win.eventdata.targetUserName) | Created by: $(win.eventdata.subjectUserName)</description>
+
+  <mitre>
+    <id>T1098</id>
+  </mitre>
+
+  <group>persistence,account_manipulation,user_creation,high_confidence,case_14,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 14: Active Response Confirmation
+     Confirms AJ SIEM disabled the unauthorized local account.
+     ========================================================= -->
+
+<rule id="111411" level="10">
+  <match>disable-case14-user.ps1: Disabled unauthorized local user</match>
+
+  <description>AJ SIEM: Active Response disabled unauthorized local user account</description>
+
+  <group>active_response,account_manipulation,user_disabled,case_14,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 15: User Added to Local Administrators
+     Detects membership change to the local Administrators group
+     Base Rule: 60154
+     Windows Event ID: 4732
+     ========================================================= -->
+
+<rule id="111501" level="15">
+  <if_sid>60154</if_sid>
+
+  <field name="win.eventdata.targetSid">S-1-5-32-544</field>
+  <field name="win.eventdata.targetUserName" type="pcre2">(?i)^Administrators$</field>
+
+  <description>AJ SIEM: High-confidence user added to local Administrators group | Performed by: $(win.eventdata.subjectUserName)</description>
+
+  <mitre>
+    <id>T1098</id>
+  </mitre>
+
+  <group>privilege_escalation,account_manipulation,administrators_group,high_confidence,case_15,</group>
+</rule>
+<!-- =========================================================
+     CASE 15: Active Response Confirmation
+     Confirms AJ SIEM removed the unauthorized user
+     from the local Administrators group.
+     ========================================================= -->
+
+<rule id="111511" level="10">
+  <match>remove-case15-admin.ps1: Removed unauthorized user from Administrators</match>
+
+  <description>AJ SIEM: Active Response removed unauthorized user from local Administrators group</description>
+
+  <group>active_response,privilege_escalation,administrators_group,user_removed,case_15,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 16: Scheduled Task Persistence
+     Detects creation of the AJ_CASE16_TEST scheduled task
+     via schtasks.exe using Sysmon Event ID 1.
+     MITRE ATT&CK: T1053.005 - Scheduled Task
+     ========================================================= -->
+
+<rule id="111601" level="15">
+  <if_group>sysmon_event1</if_group>
+
+  <field name="win.eventdata.image" type="pcre2">(?i)\\schtasks\.exe$</field>
+
+  <field name="win.eventdata.commandLine" type="pcre2">(?i)/create.*AJ_CASE16_TEST</field>
+
+  <description>AJ SIEM: High-confidence scheduled task persistence detected | Task: AJ_CASE16_TEST | CMD: $(win.eventdata.commandLine)</description>
+
+  <mitre>
+    <id>T1053.005</id>
+  </mitre>
+
+  <group>persistence,scheduled_task,task_creation,high_confidence,case_16,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 16: Active Response Confirmation
+     Confirms AJ SIEM removed the unauthorized scheduled task.
+     ========================================================= -->
+
+<rule id="111611" level="10">
+  <match>remove-case16-task.ps1: Removed unauthorized scheduled task</match>
+
+  <description>AJ SIEM: Active Response removed unauthorized scheduled task</description>
+
+  <group>active_response,persistence,scheduled_task,task_removed,case_16,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 17: Suspicious Windows Service Creation
+     Detects creation of AJ_CASE17_TEST as a Windows service
+     using Service Control Manager Event ID 7045.
+     Base Rule: 61138
+     MITRE ATT&CK: T1543.003 - Windows Service
+     ========================================================= -->
+
+<rule id="111701" level="15">
+  <if_sid>61138</if_sid>
+
+  <field name="win.eventdata.serviceName" type="pcre2">(?i)^AJ_CASE17_TEST$</field>
+
+  <description>AJ SIEM: High-confidence suspicious Windows service creation detected | Service: $(win.eventdata.serviceName) | ImagePath: $(win.eventdata.imagePath)</description>
+
+  <mitre>
+    <id>T1543.003</id>
+  </mitre>
+
+  <group>persistence,privilege_escalation,windows_service,service_creation,high_confidence,case_17,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 17: Active Response Confirmation
+     Confirms AJ SIEM removed the unauthorized Windows service.
+     ========================================================= -->
+
+<rule id="111711" level="10">
+  <match>remove-case17-service.ps1: Removed unauthorized Windows service</match>
+
+  <description>AJ SIEM: Active Response removed unauthorized Windows service</description>
+
+  <group>active_response,persistence,windows_service,service_removed,case_17,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 18: Registry Run Key Persistence
+     Detects modification of a registry entry configured
+     to execute automatically at user logon.
+     Base Rule: 92302
+     MITRE ATT&CK: T1547.001
+     ========================================================= -->
+
+<rule id="111801" level="15">
+  <if_sid>92302</if_sid>
+
+  <description>AJ SIEM: High-confidence Registry Run Key persistence detected | Registry: $(win.eventdata.targetObject) | Payload: $(win.eventdata.details)</description>
+
+  <mitre>
+    <id>T1547.001</id>
+  </mitre>
+
+  <group>persistence,registry_run_key,startup,high_confidence,case_18,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 18: Active Response Confirmation
+     Confirms AJ SIEM removed the unauthorized Registry Run Key.
+     ========================================================= -->
+
+<rule id="111811" level="10">
+  <match>remove-case18-runkey.ps1: Removed unauthorized Registry Run Key</match>
+
+  <description>AJ SIEM: Active Response removed unauthorized Registry Run Key persistence</description>
+
+  <group>active_response,persistence,registry_run_key,runkey_removed,case_18,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 19: Windows Firewall Disabled
+     Detects Windows Firewall being disabled through
+     FirewallPolicy registry state changes.
+     Base Rule: 185011 - Sysmon Event 13
+     MITRE ATT&CK: T1562.004
+     ========================================================= -->
+
+<rule id="111901" level="15">
+  <if_sid>61615</if_sid>
+
+  <field name="win.eventdata.targetObject" type="pcre2">(?i)FirewallPolicy.*EnableFirewall$</field>
+
+  <field name="win.eventdata.details" type="pcre2">0x00000000</field>
+
+  <description>AJ SIEM: High-confidence Windows Firewall disabled | Registry: $(win.eventdata.targetObject) | State: $(win.eventdata.details)</description>
+
+  <mitre>
+    <id>T1562.004</id>
+  </mitre>
+
+  <group>defense_evasion,firewall_disabled,security_controls,high_confidence,case_19,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 19: Active Response Confirmation
+     Confirms AJ SIEM restored Windows Firewall.
+     ========================================================= -->
+
+<rule id="111911" level="10">
+  <match>restore-firewall.ps1: Restored Windows Firewall</match>
+
+  <description>AJ SIEM: Active Response restored Windows Firewall protection</description>
+
+  <group>active_response,defense_evasion,firewall_restored,security_controls,case_19,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 20: Windows Event Logs Cleared
+     Event ID 104  = Any Windows Event Log cleared
+     Event ID 1102 = Security Audit Log cleared
+     MITRE ATT&CK: T1070.001 - Clear Windows Event Logs
+     ========================================================= -->
+
+<rule id="112001" level="15">
+  <if_sid>63104,60117</if_sid>
+
+  <description>AJ SIEM: High-confidence Windows Event Log cleared | Event ID: $(win.system.eventID) | Host: $(win.system.computer)</description>
+
+  <mitre>
+    <id>T1070.001</id>
+  </mitre>
+
+  <group>defense_evasion,indicator_removal,log_clearing,high_confidence,case_20,</group>
+</rule>
+
+<!-- =========================================================
+     CASE 20: Active Response Confirmation
+     Confirms AJ SIEM preserved evidence after log clearing.
+     ========================================================= -->
+
+<rule id="112011" level="10">
+  <match>preserve-log-clear-evidence.ps1: Preserved log-clearing evidence</match>
+
+  <description>AJ SIEM: Active Response preserved evidence after Windows Event Log clearing</description>
+
+  <group>active_response,defense_evasion,log_clearing,evidence_preserved,case_20,</group>
+</rule>
+
+</group>
