@@ -44,14 +44,11 @@ All testing was performed inside an isolated virtual environment.
 
 ## Screenshots
 
-### DNS Tunneling Detection & Active Response
-![DNS Tunneling Detection and Active Response](dns-tunneling-active-response.png)
+![DNS Tunneling Detection and Active Response](screenshots/dns-tunneling-active-response.png)
 
-### Credential Dumping Detection & Active Response
-![Credential Dumping Detection and Active Response](credential-dumping-active-response.png)
+![Credential Dumping Detection and Active Response](screenshots/credential-dumping-active-response.png)
 
-### Ransomware Detection
-![Ransomware Detection](ransomware-detection.png)
+![Ransomware Detection](screenshots/ransomware-detection.png)
 
 
 ## Security Use Cases
